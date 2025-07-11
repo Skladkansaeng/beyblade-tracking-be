@@ -1,0 +1,11 @@
+[project]
+name = "beyblade-tracking-be"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.116.0",
+    "opencv-python>=4.12.0.88",
+    "ultralytics>=8.3.163",
+]

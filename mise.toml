@@ -1,0 +1,5 @@
+[tools]
+uv = "latest"
+
+[tasks.dev]
+run = "fastapi dev main.py"
