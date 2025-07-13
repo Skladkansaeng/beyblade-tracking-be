@@ -1,5 +1,6 @@
 import math
 import os
+import subprocess
 import tempfile
 import cv2
 import threading
@@ -9,6 +10,29 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi.responses import StreamingResponse
 
 from inference.inferencer import InferenceModel, MovementTrailVideo, add_point, log_inference_time
+
+
+def reencode_for_web(input_path, output_path):
+    """Re-encode video for web compatibility using FFmpeg"""
+    cmd = [
+        'ffmpeg',
+        '-i', input_path,
+        '-c:v', 'libx264',
+        '-profile:v', 'baseline',
+        '-level', '3.0',
+        '-pix_fmt', 'yuv420p',
+        '-crf', '23',
+        '-preset', 'fast',  # Faster for real-time processing
+        '-movflags', '+faststart',
+        '-y',
+        output_path
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
 
 @log_inference_time
@@ -139,10 +163,33 @@ def inference(tmp_path):
 
     out.release()
 
+    web_tmpfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+    web_tmpfile_path = web_tmpfile.name
+    
+    if reencode_for_web(tmpfile_path, web_tmpfile_path):
+            # Use the web-compatible version
+            final_path = web_tmpfile_path
+            # Clean up the temporary file
+            try:
+                os.remove(tmpfile_path)
+            except:
+                pass
+    else:
+        # Fallback to original if re-encoding fails
+        final_path = tmpfile_path
+        try:
+            os.remove(web_tmpfile_path)
+        except:
+            pass
+
     def iterfile():
-        with open(tmpfile_path, mode="rb") as file_like:
+        with open(final_path, mode="rb") as file_like:
             yield from file_like
-        os.remove(tmpfile_path)
-        os.remove(tmp_path)
+        # Clean up files
+        try:
+            os.remove(final_path)
+            os.remove(tmp_path)
+        except:
+            pass
 
     return StreamingResponse(iterfile(), media_type="video/mp4")
